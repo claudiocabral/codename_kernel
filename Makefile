@@ -12,8 +12,8 @@ KERNEL_IMG_RULE := $(IMG_FOLDER)/$(KERNEL_IMG)
 
 KERNEL_OBJS := \
 	$(OBJ_FOLDER)/multiboot/header.o \
-	$(OBJ_FOLDER)/dma/video.o \
 	$(OBJ_FOLDER)/asm/start.o
+	$(OBJ_FOLDER)/kernel/kmain.o \
 
 DFLAGS ?= -betterC -boundscheck=off -m32
 

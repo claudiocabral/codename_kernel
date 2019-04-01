@@ -7,9 +7,10 @@ private:
 uint get_architecture() {
     version(X86) {
         return 0;
-    } else {
+    } version (X86_64) {
         return 0;
     }
+    return 1;
 }
 
 auto make_header(uint architecture) {

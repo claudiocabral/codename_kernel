@@ -14,6 +14,7 @@ KERNEL_IMG_RULE := $(IMG_FOLDER)/$(KERNEL_IMG)
 
 KERNEL_OBJS := \
 	$(OBJ_FOLDER)/multiboot/header.o \
+	$(OBJ_FOLDER)/drivers/vga.o \
 	$(OBJ_FOLDER)/asm/start.o \
 	$(OBJ_FOLDER)/kernel/kmain.o
 
@@ -25,21 +26,22 @@ $(KERNEL_NAME).iso: $(KERNEL_BINARY)
 	@mkdir -p iso/boot/grub || true
 	@cp -v config/grub.cfg iso/boot/grub/grub.cfg
 	@cp -v $(KERNEL_BINARY) iso/boot/
-	grub-mkrescue iso -o $@ iso/
+	@echo Generating $@
+	@grub-mkrescue iso -o $@ iso/ 2>&-
 
 
 $(KERNEL_BINARY): $(KERNEL_OBJS) linker/kernel.ld
-	ld -T linker/kernel.ld $(KERNEL_OBJS) \
+	@ld -T linker/kernel.ld $(KERNEL_OBJS) \
 		-m elf_i386 \
 		-o $(KERNEL_BINARY)
 
 $(OBJ_FOLDER)/%.o : %.d
-	ldc $(DFLAGS) -c $< -of $@
+	@ldc $(DFLAGS) -c $< -of $@
 
 $(OBJ_FOLDER)/%.o : %.s
 	$(eval DIR := $(dir $@))
 	@[[ -d $(DIR) ]] || mkdir -p $(DIR)
-	nasm -f elf32 $< -o $@
+	@nasm -f elf32 $< -o $@
 
 img: format_img
 
@@ -74,10 +76,10 @@ $(KERNEL_IMG_RULE): umount
 	@dd if=/dev/zero of=$@ bs=512 count=40960
 
 clean:
-	rm -rf $(OBJ_FOLDER)
+	@rm -rf $(OBJ_FOLDER)
 
 fclean: clean
 
 re:
-	$(MAKE) fclean
-	$(MAKE)
+	@$(MAKE) fclean
+	@$(MAKE)

@@ -1,49 +1,35 @@
-module dma.video;
+module kernel.kmain;
+
 import std.traits: CopyConstness;
+import drivers.vga;
 
 auto makeArray(T, Ptr)(Ptr *ptr, size_t size) @nogc nothrow {
     return (cast(CopyConstness!(Ptr, T *)) ptr)[0 .. size];
 }
 
-__gshared video_ptr = t_video_ptr();
-
-struct t_video_ptr {
-    void *ptr = cast(void *)0xb8000;
-    auto toArray() {
-        return makeArray!ushort(ptr, 32);
+ptrdiff_t copy_memory(A, B)(A[] dst, B[] src) {
+    foreach(i, const ref val; src) {
+        dst[i] = val;
     }
-    alias toArray this;
+    return src.length;
 }
 
-enum color : ubyte {
-    black = 0x0,
-    blue,
-    green,
-    cyan,
-    red,
-    magenta,
-    brown,
-    gray,
-    dark,
-    bright_blue,
-    bright_green,
-    bright_cyan,
-    bright_read,
-    bright_magenta,
-    yellow,
-    white,
-} 
+enum log_level {
+    info = 0
+}
 
-extern (C) {
-    size_t write(string str) {
-        auto ptr = video_ptr;
-        foreach(i, val; str) {
-            ptr[i] = val;
-        }
-        return str.length;
-    }
+bool valid_fmt(Args...)(string fmt, Args args) {
+    return 1;
+}
 
-    void kmain() {
-        write("Hello World!");
-    }
+ptrdiff_t print_formatted(log_level level, string fmt, Args...)(Args args) {
+    static assert(valid_fmt(fmt, args), "invalid format");
+    return copy_memory(video_ptr, fmt);
+}
+
+alias print_info(string fmt, Args...) = print_formatted!(log_level.info, fmt, Args);
+
+extern (C) void kmain() {
+    immutable wstring str = "Hello World!";
+    print_info!(str);
 }

@@ -4,3 +4,7 @@ bin
 obj
 img
 .deps
+*.bin
+*.iso
+iso
+mnt

@@ -4,6 +4,8 @@ IMG_FOLDER ?= img
 
 KERNEL_NAME ?= kernel
 
+KERNEL_BINARY := $(BIN_FOLDER)/$(KERNEL_NAME)
+
 KERNEL_IMG ?= $(KERNEL_NAME).img
 
 MNT_PATH ?= ./mnt
@@ -12,19 +14,24 @@ KERNEL_IMG_RULE := $(IMG_FOLDER)/$(KERNEL_IMG)
 
 KERNEL_OBJS := \
 	$(OBJ_FOLDER)/multiboot/header.o \
-	$(OBJ_FOLDER)/asm/start.o
-	$(OBJ_FOLDER)/kernel/kmain.o \
+	$(OBJ_FOLDER)/asm/start.o \
+	$(OBJ_FOLDER)/kernel/kmain.o
 
 DFLAGS ?= -betterC -boundscheck=off -m32
 
-all: $(KERNEL_NAME).bin
+all: $(KERNEL_NAME).iso
 
-img: format_img
+$(KERNEL_NAME).iso: $(KERNEL_BINARY)
+	@mkdir -p iso/boot/grub || true
+	@cp -v config/grub.cfg iso/boot/grub/grub.cfg
+	@cp -v $(KERNEL_BINARY) iso/boot/
+	grub-mkrescue iso -o $@ iso/
 
-$(KERNEL_NAME).bin: $(KERNEL_OBJS) linker/kernel.ld
+
+$(KERNEL_BINARY): $(KERNEL_OBJS) linker/kernel.ld
 	ld -T linker/kernel.ld $(KERNEL_OBJS) \
 		-m elf_i386 \
-		-o $(KERNEL_NAME).bin
+		-o $(KERNEL_BINARY)
 
 $(OBJ_FOLDER)/%.o : %.d
 	ldc $(DFLAGS) -c $< -of $@
@@ -33,6 +40,8 @@ $(OBJ_FOLDER)/%.o : %.s
 	$(eval DIR := $(dir $@))
 	@[[ -d $(DIR) ]] || mkdir -p $(DIR)
 	nasm -f elf32 $< -o $@
+
+img: format_img
 
 format_img: mount
 	sudo mkfs.ext2 /dev/loop1

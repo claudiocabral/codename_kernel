@@ -1,12 +1,18 @@
 BIN_FOLDER ?= bin
 OBJ_FOLDER ?= objs
-IMG_FOLDER ?= img
+IMG_FOLDER ?= imgs
+SRC_FOLDER := packages
+DEPS_FOLDER := .deps
+$(shell mkdir -p $(DEPS_FOLDER) >/dev/null)
+
+DEPFLAGS = -MT $@ -M -MP -MF $(DEPS_FOLDER)/$*.Td
+POSTCOMPILE = @mv -f $(DEPS_FOLDER)/$*.Td $(DEPS_FOLDER)/$*.dep && touch $@
 
 KERNEL_NAME ?= kernel
 
 KERNEL_BINARY := $(BIN_FOLDER)/$(KERNEL_NAME)
 
-KERNEL_IMG ?= $(KERNEL_NAME).img
+KERNEL_IMG ?= $(IMG_FOLDER)/$(KERNEL_NAME).iso
 
 MNT_PATH ?= ./mnt
 
@@ -20,9 +26,9 @@ KERNEL_OBJS := \
 
 DFLAGS ?= -betterC -boundscheck=off -m32
 
-all: $(KERNEL_NAME).iso
+all: $(KERNEL_IMG)
 
-$(KERNEL_NAME).iso: $(KERNEL_BINARY)
+$(KERNEL_IMG): $(KERNEL_BINARY)
 	@mkdir -p iso/boot/grub || true
 	@cp -v config/grub.cfg iso/boot/grub/grub.cfg
 	@cp -v $(KERNEL_BINARY) iso/boot/
@@ -35,13 +41,25 @@ $(KERNEL_BINARY): $(KERNEL_OBJS) linker/kernel.ld
 		-m elf_i386 \
 		-o $(KERNEL_BINARY)
 
-$(OBJ_FOLDER)/%.o : %.d
-	@ldc $(DFLAGS) -c $< -of $@
-
-$(OBJ_FOLDER)/%.o : %.s
+$(OBJ_FOLDER)/%.o : $(SRC_FOLDER)/%.d $(DEPS_FOLDER)/%.dep
 	$(eval DIR := $(dir $@))
+	$(eval CURRENT_DEPDIR := $(DIR:objs/%=$(DEPS_FOLDER)/%))
 	@[[ -d $(DIR) ]] || mkdir -p $(DIR)
-	@nasm -f elf32 $< -o $@
+	@[[ -d $(CURRENT_DEPDIR) ]] || mkdir -p $(CURRENT_DEPDIR)
+	@echo [LDC]	$@
+	@ldc $(DFLAGS) -c  -I$(SRC_FOLDER) $< -of $@\
+		-deps=$(DEPS_FOLDER)/$*.Td
+	@$(POSTCOMPILE)
+
+$(OBJ_FOLDER)/%.o: $(SRC_FOLDER)/%.s $(DEPS_FOLDER)/%.dep
+	$(eval DIR := $(dir $@))
+	$(eval CURRENT_DEPDIR := $(DIR:objs/%=$(DEPS_FOLDER)/%))
+	@[[ -d $(DIR) ]] || mkdir -p $(DIR)
+	@[[ -d $(CURRENT_DEPDIR) ]] || mkdir -p $(CURRENT_DEPDIR)
+	@[[ -d $(DIR) ]] || mkdir -p $(DIR)
+	nasm $< $(DEPFLAGS)
+	nasm -f elf32 $< -o $@
+	@$(POSTCOMPILE)
 
 img: format_img
 
@@ -83,3 +101,10 @@ fclean: clean
 re:
 	@$(MAKE) fclean
 	@$(MAKE)
+
+
+$(DEPS_FOLDER)/%.dep: ;
+.PRECIOUS: $(DEPS_FOLDER)/%.d
+
+include $(wildcard $(patsubst %,$(DEPS_FOLDER)/%.dep,$(basename $(SRCS))))
+

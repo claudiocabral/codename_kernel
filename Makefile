@@ -66,13 +66,15 @@ img: format_img
 format_img: mount
 	sudo mkfs.ext2 /dev/loop1
 	sudo mount /dev/loop1 ./mnt
-	sudo grub-install --locale-directory=/usr/share/locale/en_US \
+	sudo grub-install \
+		--boot-directory=./mnt/boot \
+		--locale-directory=/usr/share/locale/en_US \
 		--font=deja_vu \
 		--target=i386-pc \
-		--boot-directory=./mnt/boot \
 		--modules="normal part_msdos ext2 multiboot2 biosdisk" \
 		/dev/loop0
 	sudo cp grub.cfg ./mnt/boot/grub/
+	sync
 
 partition_img: $(KERNEL_IMG_RULE) umount
 	@echo Preparing kernel img $(KERNEL_IMG_RULE)
@@ -107,4 +109,3 @@ $(DEPS_FOLDER)/%.dep: ;
 .PRECIOUS: $(DEPS_FOLDER)/%.d
 
 include $(wildcard $(patsubst %,$(DEPS_FOLDER)/%.dep,$(basename $(SRCS))))
-

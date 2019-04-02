@@ -9,6 +9,8 @@ auto makeArray(T, Ptr)(Ptr *ptr, size_t size) @nogc nothrow {
 
 ptrdiff_t copy_memory(A, B)(A[] dst, B[] src) {
     foreach(i, const ref val; src) {
+        if (dst.length < i)
+            break ;
         dst[i] = val;
     }
     return src.length;
@@ -24,7 +26,7 @@ bool valid_fmt(Args...)(string fmt, Args args) {
 
 ptrdiff_t print_formatted(log_level level, string fmt, Args...)(Args args) {
     static assert(valid_fmt(fmt, args), "invalid format");
-    return copy_memory(video_ptr, fmt);
+    return copy_memory(video_ptr.ptr.makeArray!ushort(32), fmt);
 }
 
 alias print_info(string fmt, Args...) = print_formatted!(log_level.info, fmt, Args);

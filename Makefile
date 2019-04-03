@@ -23,7 +23,6 @@ KERNEL_OBJS := \
 	$(OBJ_FOLDER)/drivers/vga.o \
 	$(OBJ_FOLDER)/assembly/start.o \
 	$(OBJ_FOLDER)/assembly/multiboot.o \
-	$(OBJ_FOLDER)/assembly/volatile.o \
 	$(OBJ_FOLDER)/kernel/kmain.o
 
 DFLAGS ?= -flto=full -betterC -boundscheck=off -m32 -O3

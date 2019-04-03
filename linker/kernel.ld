@@ -3,10 +3,13 @@ ENTRY(start)
 SECTIONS{
     . = 1M;
  
-    .multiboot BLOCK(4K) : ALIGN(4K) 
+    .multiboot : ALIGN(4K) 
     {
+        
 	    *(.multiboot_header)
 	    *(.rodata.multiboot_header)
+	    KEEP(*(.multiboot_header))
+	    KEEP(*(.rodata.multiboot_header))
     }
 
     .text ALIGN(4K) : {

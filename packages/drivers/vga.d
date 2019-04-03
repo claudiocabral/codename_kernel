@@ -23,6 +23,7 @@ struct video_ptr_t {
         if (width < column || height < row)
             return 0;
         return *(cast(ushort *)ptr + column * row) = value;
+        //return *(cast(ushort *)ptr + column * row) = value;
     }
     void *ptr;
     size_t width;
@@ -55,7 +56,8 @@ enum color_t : ushort {
     white,
 } 
 
-ushort make_character(ushort character, color_t foreground, color_t background) {
+ushort make_character(ushort character, color_t foreground,
+        color_t background = color_t.black) {
     return cast(ushort)((foreground << 12)
          + (background << 8)
          + character);
@@ -68,11 +70,10 @@ bool switch_screen(size_t n_cols, size_t n_rows)(video_ptr_t video, ref
 }
 
 size_t write(string str) {
-    auto ptr = video_ptr;
     foreach(i, val; str) {
         auto width = i % vga_columns;
         auto height = i / vga_columns;
-        //ptr[width][height] = make_character(val, color_t.green, color_t.black);
+        video_ptr[width, height] = make_character(val, color_t.green, color_t.black);
     }
     return str.length;
 }

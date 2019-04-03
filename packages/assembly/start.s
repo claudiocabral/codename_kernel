@@ -1,5 +1,3 @@
-[BITS 32]
-
 global start
 
 extern kmain;
@@ -9,6 +7,7 @@ start:
 cli
 mov  esp, stack_end  ; Set the stack pointer
 call kmain
+cli
 hlt
 
 section .bss

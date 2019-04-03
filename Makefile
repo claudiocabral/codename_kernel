@@ -3,6 +3,7 @@ OBJ_FOLDER ?= objs
 IMG_FOLDER ?= imgs
 SRC_FOLDER := packages
 DEPS_FOLDER := .deps
+DC ?= ldc
 $(shell mkdir -p $(DEPS_FOLDER) >/dev/null)
 
 DEPFLAGS = -MT $@ -M -MP -MF $(DEPS_FOLDER)/$*.Td
@@ -19,12 +20,13 @@ MNT_PATH ?= ./mnt
 KERNEL_IMG_RULE := $(IMG_FOLDER)/$(KERNEL_IMG)
 
 KERNEL_OBJS := \
-	$(OBJ_FOLDER)/multiboot/header.o \
 	$(OBJ_FOLDER)/drivers/vga.o \
-	$(OBJ_FOLDER)/asm/start.o \
+	$(OBJ_FOLDER)/assembly/start.o \
+	$(OBJ_FOLDER)/assembly/multiboot.o \
+	$(OBJ_FOLDER)/assembly/volatile.o \
 	$(OBJ_FOLDER)/kernel/kmain.o
 
-DFLAGS ?= -betterC -boundscheck=off -m32
+DFLAGS ?= -flto=full -betterC -boundscheck=off -m32 -O3
 
 all: $(KERNEL_IMG)
 
@@ -37,17 +39,22 @@ $(KERNEL_IMG): $(KERNEL_BINARY)
 
 
 $(KERNEL_BINARY): $(KERNEL_OBJS) linker/kernel.ld
-	@ld -T linker/kernel.ld $(KERNEL_OBJS) \
+	@ld.lld \
+		--script linker/kernel.ld \
 		-m elf_i386 \
-		-o $(KERNEL_BINARY)
+		--verbose \
+		$(KERNEL_OBJS) \
+		-o $(KERNEL_BINARY) \
+		-O3 \
+		-lto-O3 \
 
 $(OBJ_FOLDER)/%.o : $(SRC_FOLDER)/%.d $(DEPS_FOLDER)/%.dep
 	$(eval DIR := $(dir $@))
 	$(eval CURRENT_DEPDIR := $(DIR:objs/%=$(DEPS_FOLDER)/%))
 	@[[ -d $(DIR) ]] || mkdir -p $(DIR)
 	@[[ -d $(CURRENT_DEPDIR) ]] || mkdir -p $(CURRENT_DEPDIR)
-	@echo [LDC]	$@
-	@ldc $(DFLAGS) -c  -I$(SRC_FOLDER) $< -of $@\
+	@echo [$(DC)]	$@
+	@$(DC) $(DFLAGS) -c -I$(SRC_FOLDER) $< -of $@\
 		-deps=$(DEPS_FOLDER)/$*.Td
 	@$(POSTCOMPILE)
 
@@ -106,6 +113,6 @@ re:
 
 
 $(DEPS_FOLDER)/%.dep: ;
-.PRECIOUS: $(DEPS_FOLDER)/%.d
+.PRECIOUS: $(DEPS_FOLDER)/%.dep
 
 include $(wildcard $(patsubst %,$(DEPS_FOLDER)/%.dep,$(basename $(SRCS))))

@@ -1,14 +1,22 @@
 module libkernel.memory;
+pragma(LDC_no_moduleinfo);
 
 import ldc.llvmasm;
+import libkernel.conversion;
+import ldc.intrinsics;
+
+ptrdiff_t copy_volatile_memory(A, B)(A *dst, B[] src) {
+    foreach(i, const ref val; src) {
+        store(dst + i, val);
+    }
+    return src.length;
 
 ptrdiff_t copy_volatile_memory(A, B)(A[] dst, B[] src) {
-    if (src.length > dst.length)
-        src = src[0 .. dst.length];
     foreach(i, const ref val; src) {
         store(dst.ptr + i, val);
     }
     return src.length;
+}
 }
 
 pragma(inline, true)
@@ -37,4 +45,27 @@ T load(T, P)(P ptr) {
         static assert(false,
                 "Unsupported size: " ~ val.sizeof.stringof);
     }
+}
+
+extern (C) void *memset(void * dest, int c, size_t n)
+{
+    auto ptr = cast(ubyte *)dest;
+    size_t i = 0;
+    while (i < n) {
+        store(ptr + i, cast(ubyte)c);
+        ++i;
+    }
+    return dest;
+}
+
+extern (C) void *memcpy(void * dest, void * src, size_t n)
+{
+    auto to = cast(ubyte *)dest;
+    auto from = cast(ubyte *)src;
+    size_t i = 0;
+    while (i < n) {
+        store(to + i, from + i);
+        ++i;
+    }
+    return dest;
 }

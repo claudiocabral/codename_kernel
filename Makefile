@@ -23,9 +23,30 @@ KERNEL_OBJS := \
 	$(OBJ_FOLDER)/drivers/vga.o \
 	$(OBJ_FOLDER)/assembly/start.o \
 	$(OBJ_FOLDER)/assembly/multiboot.o \
+	$(OBJ_FOLDER)/libkernel/memory.o \
 	$(OBJ_FOLDER)/kernel/kmain.o
 
-DFLAGS ?= -flto=full -betterC -boundscheck=off -m32 -O3
+DFLAGS ?= -boundscheck=off \
+	  -nodefaultlib \
+	  -relocation-model=static \
+	  -release \
+	  -betterC \
+	  -march=x86
+
+LDFLAGS ?= --script linker/kernel.ld \
+	   --gc-sections \
+	   -m elf_i386 \
+
+ifeq ($(DEBUG),)
+	DFLAGS += -O3 \
+	-flto=full
+
+	LDFLAGS += -O3 \
+		-lto-O3
+else
+	DFLAGS += -g
+endif
+
 
 all: $(KERNEL_IMG)
 
@@ -38,18 +59,12 @@ $(KERNEL_IMG): $(KERNEL_BINARY)
 
 
 $(KERNEL_BINARY): $(KERNEL_OBJS) linker/kernel.ld
-	@ld.lld \
-		--script linker/kernel.ld \
-		-m elf_i386 \
-		--verbose \
-		$(KERNEL_OBJS) \
-		-o $(KERNEL_BINARY) \
-		-O3 \
-		-lto-O3 \
+	@ld.lld $(LDFLAGS) $(KERNEL_OBJS) -o $(KERNEL_BINARY)
 
-$(OBJ_FOLDER)/%.o : $(SRC_FOLDER)/%.d $(DEPS_FOLDER)/%.dep
+$(OBJ_FOLDER)/%.o : $(SRC_FOLDER)/%.d $(DEPS_FOLDER)/%.dep Makefile
 	$(eval DIR := $(dir $@))
 	$(eval CURRENT_DEPDIR := $(DIR:objs/%=$(DEPS_FOLDER)/%))
+	@touch $(SRC_FOLDER) #makefile dependency generation broken
 	@[[ -d $(DIR) ]] || mkdir -p $(DIR)
 	@[[ -d $(CURRENT_DEPDIR) ]] || mkdir -p $(CURRENT_DEPDIR)
 	@echo [$(DC)]	$@
@@ -63,8 +78,9 @@ $(OBJ_FOLDER)/%.o: $(SRC_FOLDER)/%.s $(DEPS_FOLDER)/%.dep
 	@[[ -d $(DIR) ]] || mkdir -p $(DIR)
 	@[[ -d $(CURRENT_DEPDIR) ]] || mkdir -p $(CURRENT_DEPDIR)
 	@[[ -d $(DIR) ]] || mkdir -p $(DIR)
-	nasm $< $(DEPFLAGS)
-	nasm -f elf32 $< -o $@
+	@nasm $< $(DEPFLAGS)
+	@echo [nasm]	$@
+	@nasm -f elf32 $< -o $@
 	@$(POSTCOMPILE)
 
 img: format_img
@@ -103,6 +119,7 @@ $(KERNEL_IMG_RULE): umount
 
 clean:
 	@rm -rf $(OBJ_FOLDER)
+	@rm -rf $(DEPS_FOLDER)
 
 fclean: clean
 

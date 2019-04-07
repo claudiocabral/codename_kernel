@@ -13,7 +13,12 @@ SECTIONS{
     }
 
     .text ALIGN(4K) : {
+        *(.ctors)
+        *(.dtors)
+        *(.ctors*)
+        *(.dtors*)
         *(.text)
+        *(.text*)
     }
  
     .rodata ALIGN(4K) : {
@@ -23,6 +28,9 @@ SECTIONS{
  
     .data ALIGN (4K) : {
         *(.data)
+	start_ctors = .; *(.ctors)   end_ctors = .;
+	start_dtors = .; *(.dtors)   end_dtors = .;
+
     }
  
     .bss ALIGN(4K) : {

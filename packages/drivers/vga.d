@@ -1,40 +1,79 @@
 module drivers.vga;
-import std.traits: CopyConstness;
 
-enum vga_base_address = cast(void *)0xb8000;
+import libkernel.memory: store, copy_volatile_memory;
+import libkernel.conversion;
+
+enum vga_base_address = cast(ushort *)0xb8000;
 enum vga_columns = 80;
 enum vga_rows = 25;
 enum number_of_screens = 10;
 
-__gshared video_ptr = video_ptr_t(vga_base_address, vga_columns, vga_rows);
-screen_t!(vga_columns, vga_rows)[number_of_screens] screens;
-
-struct screen_t(size_t cols, size_t lines) {
-    ushort[cols * lines] buffer;
+struct vga_driver_t {
+    video_ptr_t video_ptr;
+    screen_t!(vga_columns, vga_rows)[number_of_screens] screens;
+    size_t current;
+    void append(ushort val) {
+        screens[current].append(val);
+    }
+    void flush() {
+        video_ptr = screens[current].buffer;
+    }
 }
 
+struct point_t {
+    size_t x;
+    size_t y;
+}
+
+
+
+struct screen_t(size_t cols, size_t lines) {
+    ushort[cols * lines] buffer = 0;
+    size_t position = 0;
+    void append(ushort val) {
+        buffer[position] = val;
+        ++position;
+        //position &= 0xff;
+        position %= 80 * 25;
+    }
+    auto dump() {
+        return buffer[0 .. position];
+    }
+    alias buffer this;
+}
+
+
 struct video_ptr_t {
+    auto opAssign(ushort[] buffer) {
+        copy_volatile_memory(ptr, buffer);
+    }
+    auto opIndex(size_t i) {
+        return *(cast(ushort *)ptr + i);
+    }
     auto opIndex(size_t column, size_t row) {
         if (width < column || height < row)
             return 0;
-        return *(cast(ushort *)ptr + column * row);
+        return *(cast(ushort *)ptr + column * (row + 1));
+    }
+    auto opIndex(point_t position) {
+        return this[position.x, position.y];
+    }
+    auto opIndexAssign(ushort value, size_t i) {
+        store(ptr + i, value);
+        return value;
     }
     auto opIndexAssign(ushort value, size_t column, size_t row) {
         if (width < column || height < row)
             return 0;
-        return *(cast(ushort *)ptr + column * row) = value;
-        //return *(cast(ushort *)ptr + column * row) = value;
+        return this[column * (row + 1)] = value;
     }
-    void *ptr;
-    size_t width;
-    size_t height;
-}
-
-auto makeArray(T, Ptr)(Ptr *ptr, size_t size) @nogc nothrow {
-    return (cast(CopyConstness!(Ptr, T *)) ptr)[0 .. size];
-}
-auto make2DArray(T, Ptr)(Ptr *ptr, size_t width, size_t height) @nogc nothrow {
-    return (cast(CopyConstness!(Ptr, T *)) ptr)[0 .. width][0 .. height];
+    auto opIndexAssign(ushort value, point_t position) {
+        return this[position.x, position.y] = value;
+    }
+    size_t length() { return width * height; }
+    ushort *ptr = vga_base_address;
+    size_t width = 80;
+    size_t height = 25;
 }
 
 enum color_t : ushort {
@@ -56,24 +95,53 @@ enum color_t : ushort {
     white,
 } 
 
-ushort make_character(ushort character, color_t foreground,
-        color_t background = color_t.black) {
-    return cast(ushort)((foreground << 12)
-         + (background << 8)
-         + character);
-}
-
 bool switch_screen(size_t n_cols, size_t n_rows)(video_ptr_t video, ref
         screen_t!(n_cols, n_rows) screen) {
     auto ptr = video.toArray;
     ptr = screen.buffer;
 }
 
-size_t write(string str) {
+ushort make_character(ushort character, color_t foreground = color_t.white,
+                      color_t background = color_t.black) {
+    return cast(ushort)((background << 12)
+            + (foreground << 8)
+            + character);
+}
+
+size_t write_to_screen(video_ptr_t video,
+        string str,
+        color_t foreground = color_t.white,
+        color_t background = color_t.black) {
     foreach(i, val; str) {
-        auto width = i % vga_columns;
-        auto height = i / vga_columns;
-        video_ptr[width, height] = make_character(val, color_t.green, color_t.black);
+        auto col = i % vga_columns;
+        auto row = i / vga_columns;
+        video[col, row] = make_character(val, foreground, background);
     }
     return str.length;
+}
+size_t write_to_screen(video_ptr_t video, ushort[] str) {
+    foreach(i, val; str) {
+        video[i] = val;
+    }
+    return str.length;
+}
+
+size_t write_to_current(
+        ref vga_driver_t vga,
+        string str,
+        color_t foreground = color_t.white,
+        color_t background = color_t.black) {
+    foreach(val; str) {
+        vga.write_to_current(val, foreground, background);
+    }
+    vga.flush();
+    return 1;
+}
+
+size_t write_to_current(ref vga_driver_t vga,
+        char val,
+        color_t foreground = color_t.white,
+        color_t background = color_t.black) {
+    vga.append(make_character(val, foreground, background));
+    return 1;
 }
